@@ -22,8 +22,8 @@ fn parse_value(p: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
     debug_assert_eq!(p.as_rule(), Rule::value);
     let value = p.into_inner().next().unwrap();
     match value.as_rule() {
-        Rule::object => unimplemented!(),
-        Rule::array => unimplemented!(),
+        Rule::object => parse_object(value),
+        Rule::array => parse_array(value),
         Rule::string => parse_string(value),
         Rule::number => parse_number(value),
         Rule::boolean => parse_boolean(value),
@@ -46,20 +46,38 @@ fn parse_boolean(p: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
     }
 }
 
+fn parse_array(array: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
+    debug_assert_eq!(array.as_rule(), Rule::array);
+    let mut values: Vec<JsonValue> = Vec::new();
+    for value in array.into_inner() {
+        values.push(parse_value(value)?);
+    }
+    Ok(JsonValue::Array(values))
+}
+
+fn parse_object(object: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
+    debug_assert_eq!(object.as_rule(), Rule::object);
+    let mut object_pairs = Vec::new();
+    for object_pair in object.into_inner() {
+        let mut object_pair_values = object_pair.into_inner();
+        let name = object_pair_values.next().context("parse object key")?.as_str();
+        let value = parse_value(object_pair_values.next().context("parse object value")?)?;
+        object_pairs.push((name, value));
+    }
+
+    Ok(JsonValue::Object(object_pairs))
+}
+
 fn parse_number(p: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
     debug_assert_eq!(p.as_rule(), Rule::number);
-    // TODO: This number parsing does not correctly reflect how 
+    // TODO: This number parsing does not correctly reflect how
     // json stores numbers
-    let n = p.as_str()
-    .parse::<f64>()
-    .context("parse number")?;
+    let n = p.as_str().parse::<f64>().context("parse number")?;
     Ok(JsonValue::Number(n))
 }
 
 #[cfg(test)]
 mod test {
-    use std::any::Any;
-
     use crate::JsonValue;
 
     use super::{parse_json, parse_value};
@@ -98,5 +116,19 @@ mod test {
         for (&input, &ref expected) in bools_and_null.iter().zip(expected.iter()) {
             assert_eq!(parse_json(input).unwrap(), *expected);
         }
+    }
+
+    const JSON_ARRAY: &'static str = "[\"hello\", 123.0, false]";
+
+    #[test]
+    fn parse_array() {
+        assert_eq!(
+            parse_json(JSON_ARRAY).unwrap(),
+            JsonValue::Array(vec![
+                JsonValue::String("hello"),
+                JsonValue::Number(123.0),
+                JsonValue::Bool(false)
+            ])
+        );
     }
 }

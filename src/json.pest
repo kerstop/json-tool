@@ -3,7 +3,7 @@ WHITESPACE = _{ (" " | "\t" | NEWLINE) }
 value         = { (object | array | string | number | boolean | null) }
 object        = { "{" ~ (object_pair ~ ("," ~ object_pair)*)? ~ "}" }
 object_pair   = { string ~ ":" ~ value }
-array         = { "[" ~ value ~ ("," ~ value)* ~ "]" }
+array         = { "[" ~ (value ~ ("," ~ value)*)? ~ "]" }
 number        = {
     "-"? ~  // sign
   ("0" | '1'..'9' ~ ASCII_DIGIT*) ~  // number
