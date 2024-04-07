@@ -1,19 +1,35 @@
+use std::path::PathBuf;
+
+use clap::Parser;
+
+mod json_value;
 mod parsing;
 
 /// A tool for dealing with JSON
 #[derive(clap::Parser, Debug)]
-struct Args {}
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
 
-#[derive(Debug, PartialEq)]
-enum JsonValue<'a> {
-    String(&'a str),
-    Number(f64),
-    Array(Vec<JsonValue<'a>>),
-    Object(Vec<(&'a str, JsonValue<'a>)>),
-    Bool(bool),
-    Null,
+#[derive(clap::Subcommand, Debug)]
+enum Command {
+    Format {
+        file: Option<PathBuf>,
+    },
+
+    Get {
+        file: Option<PathBuf>,
+        key: String,
+    },
+
+    Set {
+        file: Option<PathBuf>,
+        key: String,
+        value: String,
+    },
 }
 
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
 }

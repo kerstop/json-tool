@@ -4,7 +4,7 @@ use anyhow::Context;
 use pest::iterators::Pair;
 use pest::Parser;
 
-use crate::JsonValue;
+use crate::json_value::JsonValue;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "src/json.pest"]
@@ -78,9 +78,9 @@ fn parse_number(p: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
 
 #[cfg(test)]
 mod test {
-    use crate::JsonValue;
+    use crate::json_value::JsonValue;
 
-    use super::{parse_json, parse_value};
+    use super::{parse_json};
 
     const JSON_OBJECT: &'static str = r#"{
     "nesting": { "inner object": {} },
