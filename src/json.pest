@@ -1,0 +1,24 @@
+WHITESPACE = _{ (" " | "\t" | NEWLINE) }
+
+value         = { (object | array | string | number | boolean | null) }
+object        = { "{" ~ (object_pair ~ ("," ~ object_pair)*)? ~ "}" }
+object_pair   = { string ~ ":" ~ value }
+array         = { "[" ~ value ~ ("," ~ value)* ~ "]" }
+number        = {
+    "-"? ~  // sign
+  ("0" | '1'..'9' ~ ASCII_DIGIT*) ~  // number
+  ("." ~ ASCII_DIGIT*)? ~  // fraction
+  (("E" | "e") ~ ("+" | "-")? ~ ASCII_DIGIT*)?
+}
+boolean = { "true" | "false" }
+null    = { "null" }
+
+string            = ${ "\"" ~ inner_string ~ "\"" }
+inner_string      = @{ inner_string_char* }
+inner_string_char =  {
+    !("\"" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+json_file = { SOI ~ value ~ EOI }
