@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match args.command {
         Command::Format { dense } => match dense {
             true => println!("{}", parsed_input.fmt_dense()),
-            false => todo!(),
+            false => println!("{}", parsed_input.fmt_pretty()),
         },
         Command::Get { key } => todo!(),
         Command::Set { key, value } => todo!(),
