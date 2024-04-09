@@ -1,9 +1,14 @@
 # json-tool
-A command line tool to work with json files.
+A command line tool to work with json files, using zero copy wherever possible.
 
-## Usage
+## Features
+
+currently json-tool supports two operations
+
+### Formating
+
 ```bash
-> echo '{"hello":"world"}' | json-tool 
+> echo '{"hello":"world"}' | json-tool fmt
 {
     "hello": "world"
 }
