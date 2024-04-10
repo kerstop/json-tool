@@ -8,11 +8,11 @@ use crate::json_value::JsonValue;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "src/json.pest"]
-struct JsonParser;
+pub(crate) struct JsonParser;
 
 /// parse a single json str
 pub fn parse_json(json: &str) -> Result<JsonValue<'_>, Box<dyn Error>> {
-    let mut file = JsonParser::parse(Rule::json_file, json)?.next().unwrap();
+    let file = JsonParser::parse(Rule::json_file, json)?.next().unwrap();
     debug_assert_eq!(file.as_rule(), Rule::json_file);
 
     return parse_value(file.into_inner().next().unwrap());
@@ -60,7 +60,13 @@ fn parse_object(object: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>>
     let mut object_pairs = Vec::new();
     for object_pair in object.into_inner() {
         let mut object_pair_values = object_pair.into_inner();
-        let name = object_pair_values.next().context("parse object key")?.as_str();
+        let name = object_pair_values
+            .next()
+            .context("parse object key")?
+            .into_inner()
+            .next()
+            .unwrap()
+            .as_str();
         let value = parse_value(object_pair_values.next().context("parse object value")?)?;
         object_pairs.push((name, value));
     }
@@ -80,7 +86,7 @@ fn parse_number(p: Pair<'_, Rule>) -> Result<JsonValue<'_>, Box<dyn Error>> {
 mod test {
     use crate::json_value::JsonValue;
 
-    use super::{parse_json};
+    use super::parse_json;
 
     const JSON_OBJECT: &'static str = r#"{
     "nesting": { "inner object": {} },
@@ -116,6 +122,12 @@ mod test {
         for (&input, &ref expected) in bools_and_null.iter().zip(expected.iter()) {
             assert_eq!(parse_json(input).unwrap(), *expected);
         }
+    }
+
+    #[test]
+    fn parse_numbers() {
+        let value = parse_json("1.2").unwrap();
+        assert_eq!(value, JsonValue::Number(1.2));
     }
 
     const JSON_ARRAY: &'static str = "[\"hello\", 123.0, false]";

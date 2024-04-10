@@ -4,7 +4,7 @@ value         = { (object | array | string | number | boolean | null) }
 object        = { "{" ~ (object_pair ~ ("," ~ object_pair)*)? ~ "}" }
 object_pair   = { string ~ ":" ~ value }
 array         = { "[" ~ (value ~ ("," ~ value)*)? ~ "]" }
-number        = {
+number        = @{
     "-"? ~  // sign
   ("0" | '1'..'9' ~ ASCII_DIGIT*) ~  // number
   ("." ~ ASCII_DIGIT*)? ~  // fraction
@@ -22,3 +22,10 @@ inner_string_char =  {
 }
 
 json_file = { SOI ~ value ~ EOI }
+
+json_path_index = { NUMBER* }
+json_path_index_op = _{ "[" ~ json_path_index ~ "]"}
+json_path_key = { (!("." | "[") ~ ANY)* }
+/// search and parse out the keys and indecies from a json path
+/// ex: hello.world[3]
+json_path = ${SOI ~ json_path_key ~ json_path_index_op* ~ ("." ~ json_path_key ~ json_path_index_op*)* ~ EOI}

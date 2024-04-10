@@ -8,6 +8,8 @@ mod parsing;
 /// A tool for dealing with JSON
 #[derive(clap::Parser, Debug)]
 struct Args {
+        #[arg(short)]
+        dense: bool,
     /// file to operate on, blank for stdin
     file: Option<PathBuf>,
     #[command(subcommand)]
@@ -19,8 +21,6 @@ enum Command {
     /// format the input
     #[command(name = "fmt")]
     Format {
-        #[arg(short)]
-        dense: bool,
     },
 
     Get {
@@ -44,12 +44,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let parsed_input = parsing::parse_json(&input)?;
 
     match args.command {
-        Command::Format { dense } => match dense {
+        Command::Format {} => match args.dense {
             true => println!("{}", parsed_input.fmt_dense()),
             false => println!("{}", parsed_input.fmt_pretty()),
         },
-        Command::Get { key } => todo!(),
-        Command::Set { key, value } => todo!(),
+        Command::Get { key } => match args.dense {
+            true => println!("{}", parsed_input.get_path(&key)?.fmt_dense()),
+            false => println!("{}", parsed_input.get_path(&key)?.fmt_pretty()),
+        },
+        Command::Set {..} => todo!(),
     }
 
     Ok(())

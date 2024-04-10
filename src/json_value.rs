@@ -1,5 +1,8 @@
 use std::fmt::{self, Formatter, Write};
 
+use anyhow::{anyhow, Result};
+use pest::Parser;
+
 const NEWLINE_CHAR: char = '\n';
 
 #[derive(Debug, PartialEq)]
@@ -21,6 +24,60 @@ impl<'a> JsonValue<'a> {
         PrettyFormatter {
             json: self,
             tabstring: String::from("  "),
+        }
+    }
+
+    pub fn get_path(&self, path: &str) -> Result<&JsonValue<'a>> {
+        use crate::parsing::{JsonParser, Rule};
+
+        let pairs = JsonParser::parse(Rule::json_path, path)
+            .map_err(|_| anyhow!("provided path is malformated \"{path}\""))?
+            .next()
+            .unwrap()
+            .into_inner();
+
+        let mut current_value = self;
+
+        for pair in pairs {
+            match pair.as_rule() {
+                Rule::json_path_key => {
+                    let key = pair.as_str();
+                    current_value = current_value.get_key(key)?;
+                }
+                Rule::json_path_index => {
+                    let index = pair.as_str().parse().unwrap();
+                    current_value = current_value.get_index(index)?;
+                }
+                Rule::EOI => (),
+                _ => unreachable!(),
+            }
+        }
+        Ok(current_value)
+    }
+
+    pub fn get_key(&self, key: &str) -> Result<&JsonValue<'a>> {
+        if let JsonValue::Object(o) = self {
+            match o.iter().find(|(key_l, _)| *key_l == key) {
+                Some((_, value)) => Ok(value),
+                None => Err(anyhow!("key {} does not exist", key)),
+            }
+        } else {
+            Err(anyhow!(
+                "tried to index a value that was not an object with key {key}"
+            ))
+        }
+    }
+
+    pub fn get_index(&self, index: usize) -> Result<&JsonValue<'a>> {
+        if let JsonValue::Array(a) = self {
+            match a.get(index) {
+                Some(v) => Ok(v),
+                None => Err(anyhow!("Index {index} out of bounds")),
+            }
+        } else {
+            Err(anyhow!(
+                "tried to index a value that was not an object with key {index}"
+            ))
         }
     }
 }
@@ -50,7 +107,7 @@ impl PrettyFormatter<'_> {
                     for value in values {
                         f.write_char(',')?;
                         f.write_char(NEWLINE_CHAR)?;
-                        self.write_indentation(numtabs + 1 , f)?;
+                        self.write_indentation(numtabs + 1, f)?;
                         self.fmt_value(value, numtabs + 1, f)?;
                     }
                     f.write_char(NEWLINE_CHAR)?;
@@ -64,7 +121,7 @@ impl PrettyFormatter<'_> {
                     f.write_char(NEWLINE_CHAR)?;
                     let mut pairs = o.iter();
                     // should have at leat one pair because length is not 0
-                    self.write_indentation(numtabs +1, f)?;
+                    self.write_indentation(numtabs + 1, f)?;
                     self.fmt_pair(pairs.next().unwrap(), numtabs + 1, f)?;
                     for pair in pairs {
                         f.write_char(',')?;
@@ -168,5 +225,34 @@ impl DenseFormatter<'_> {
 impl fmt::Display for DenseFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_value(self.json, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parsing::parse_json;
+
+    #[test]
+    fn get_value_by_path() {
+        let json_string = std::fs::read_to_string("test-json/test1.json").unwrap();
+        let root_value = parse_json(&json_string).unwrap();
+
+        assert_eq!(
+            *root_value.get_path("hello").unwrap(),
+            JsonValue::String("world")
+        );
+        assert_eq!(
+            *root_value.get_path("foo[0].bar").unwrap(),
+            JsonValue::String("baz")
+        );
+        assert_eq!(
+            *root_value.get_path("foo[0].a").unwrap(),
+            JsonValue::Number(1.0)
+        );
+        assert_eq!(
+            *root_value.get_path("foo[0].b").unwrap(),
+            JsonValue::Number(2.0)
+        );
     }
 }
