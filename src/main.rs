@@ -1,5 +1,10 @@
-use std::{error::Error, io::stdin, path::PathBuf};
+use std::{
+    error::Error,
+    io::{stdin, stdout, Write},
+    path::PathBuf,
+};
 
+use anyhow::anyhow;
 use clap::Parser;
 
 mod json_value;
@@ -8,26 +13,24 @@ mod parsing;
 /// A tool for dealing with JSON
 #[derive(clap::Parser, Debug)]
 struct Args {
-        #[arg(short)]
-        dense: bool,
-    /// file to operate on, blank for stdin
-    file: Option<PathBuf>,
+    /// format the output with no whitespace
+    #[arg(short)]
+    dense: bool,
+    /// omit to format only
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(clap::Subcommand, Debug)]
 enum Command {
-    /// format the input
-    #[command(name = "fmt")]
-    Format {
-    },
+    /// get a value
+    Get { key: String },
 
-    Get {
-        key: String,
-    },
-
+    /// set a value
     Set {
+        /// write to stdout instead of the file
+        #[arg(short)]
+        stdout: bool,
         key: String,
         value: String,
     },
@@ -36,23 +39,32 @@ enum Command {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    let input = match args.file {
-        Some(path) => std::fs::read_to_string(path)?,
-        None => std::io::read_to_string(stdin())?,
-    };
+    let input = std::io::read_to_string(stdin())?;
 
-    let parsed_input = parsing::parse_json(&input)?;
+    let parsed_input = parsing::parse_json(&input).map_err(|_| anyhow!("failed to parse input"))?;
 
-    match args.command {
-        Command::Format {} => match args.dense {
-            true => println!("{}", parsed_input.fmt_dense()),
-            false => println!("{}", parsed_input.fmt_pretty()),
+    let mut out = stdout().lock();
+
+    match &args.command {
+        None {} => match args.dense {
+            true => write!(&mut out, "{}", parsed_input.fmt_dense())?,
+            false => write!(&mut out, "{}", parsed_input.fmt_pretty())?,
         },
-        Command::Get { key } => match args.dense {
-            true => println!("{}", parsed_input.get_path(&key)?.fmt_dense()),
-            false => println!("{}", parsed_input.get_path(&key)?.fmt_pretty()),
+        Some(Command::Get { key }) => match args.dense {
+            true => write!(&mut out, "{}", parsed_input.get_path(&key)?.fmt_dense())?,
+            false => write!(&mut out, "{}", parsed_input.get_path(&key)?.fmt_pretty())?,
         },
-        Command::Set {..} => todo!(),
+        Some(Command::Set { key, value, .. }) => {
+            let parsed_value = parsing::parse_json(&value)?;
+            let mut parsed_input = parsed_input;
+
+            *parsed_input.get_path_mut(&key)? = parsed_value;
+
+            match args.dense {
+                true => write!(&mut out, "{}", parsed_input.fmt_dense())?,
+                false => write!(&mut out, "{}", parsed_input.fmt_pretty())?,
+            }
+        }
     }
 
     Ok(())

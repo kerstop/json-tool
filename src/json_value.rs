@@ -42,11 +42,11 @@ impl<'a> JsonValue<'a> {
             match pair.as_rule() {
                 Rule::json_path_key => {
                     let key = pair.as_str();
-                    current_value = current_value.get_key(key)?;
+                    current_value = current_value.get_object_key(key)?;
                 }
                 Rule::json_path_index => {
                     let index = pair.as_str().parse().unwrap();
-                    current_value = current_value.get_index(index)?;
+                    current_value = current_value.get_array_index(index)?;
                 }
                 Rule::EOI => (),
                 _ => unreachable!(),
@@ -55,7 +55,7 @@ impl<'a> JsonValue<'a> {
         Ok(current_value)
     }
 
-    pub fn get_key(&self, key: &str) -> Result<&JsonValue<'a>> {
+    pub fn get_object_key(&self, key: &str) -> Result<&JsonValue<'a>> {
         if let JsonValue::Object(o) = self {
             match o.iter().find(|(key_l, _)| *key_l == key) {
                 Some((_, value)) => Ok(value),
@@ -68,9 +68,63 @@ impl<'a> JsonValue<'a> {
         }
     }
 
-    pub fn get_index(&self, index: usize) -> Result<&JsonValue<'a>> {
+    pub fn get_array_index(&self, index: usize) -> Result<&JsonValue<'a>> {
         if let JsonValue::Array(a) = self {
             match a.get(index) {
+                Some(v) => Ok(v),
+                None => Err(anyhow!("Index {index} out of bounds")),
+            }
+        } else {
+            Err(anyhow!(
+                "tried to index a value that was not an object with key {index}"
+            ))
+        }
+    }
+
+    pub fn get_path_mut(&mut self, path: &str) -> Result<&mut JsonValue<'a>> {
+        use crate::parsing::{JsonParser, Rule};
+
+        let pairs = JsonParser::parse(Rule::json_path, path)
+            .map_err(|_| anyhow!("provided path is malformated \"{path}\""))?
+            .next()
+            .unwrap()
+            .into_inner();
+
+        let mut current_value = self;
+
+        for pair in pairs {
+            match pair.as_rule() {
+                Rule::json_path_key => {
+                    let key = pair.as_str();
+                    current_value = current_value.get_object_key_mut(key)?;
+                }
+                Rule::json_path_index => {
+                    let index = pair.as_str().parse().unwrap();
+                    current_value = current_value.get_array_index_mut(index)?;
+                }
+                Rule::EOI => (),
+                _ => unreachable!(),
+            }
+        }
+        Ok(current_value)
+    }
+
+    pub fn get_object_key_mut(&mut self, key: &str) -> Result<&mut JsonValue<'a>> {
+        if let JsonValue::Object(o) = self {
+            match o.iter_mut().find(|(key_l, _)| *key_l == key) {
+                Some((_, value)) => Ok(value),
+                None => Err(anyhow!("key {} does not exist", key)),
+            }
+        } else {
+            Err(anyhow!(
+                "tried to index a value that was not an object with key {key}"
+            ))
+        }
+    }
+
+    pub fn get_array_index_mut(&mut self, index: usize) -> Result<&mut JsonValue<'a>> {
+        if let JsonValue::Array(a) = self {
+            match a.get_mut(index) {
                 Some(v) => Ok(v),
                 None => Err(anyhow!("Index {index} out of bounds")),
             }
@@ -140,6 +194,9 @@ impl PrettyFormatter<'_> {
             },
             JsonValue::Null => f.write_str("null")?,
         };
+        if numtabs == 0 {
+            f.write_char('\n')?;
+        }
         Ok(())
     }
 
@@ -149,7 +206,9 @@ impl PrettyFormatter<'_> {
         numtabs: u32,
         f: &mut Formatter,
     ) -> fmt::Result {
+        f.write_char('"')?;
         f.write_str(key)?;
+        f.write_char('"')?;
         f.write_char(':')?;
         f.write_char(' ')?;
         self.fmt_value(value, numtabs, f)?;
@@ -215,7 +274,9 @@ impl DenseFormatter<'_> {
     }
 
     fn fmt_pair(&self, (key, value): &(&str, JsonValue<'_>), f: &mut Formatter) -> fmt::Result {
+        f.write_char('"')?;
         f.write_str(key)?;
+        f.write_char('"')?;
         f.write_char(':')?;
         self.fmt_value(value, f)?;
         Ok(())
