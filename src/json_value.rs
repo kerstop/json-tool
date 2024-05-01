@@ -1,7 +1,11 @@
+mod parsing;
+
 use std::fmt::{self, Formatter, Write};
 
 use anyhow::{anyhow, Result};
 use pest::Parser;
+
+pub use parsing::parse_json;
 
 const NEWLINE_CHAR: char = '\n';
 
@@ -28,7 +32,7 @@ impl<'a> JsonValue<'a> {
     }
 
     pub fn get_path(&self, path: &str) -> Result<&JsonValue<'a>> {
-        use crate::parsing::{JsonParser, Rule};
+        use parsing::{JsonParser, Rule};
 
         let pairs = JsonParser::parse(Rule::json_path, path)
             .map_err(|_| anyhow!("provided path is malformated \"{path}\""))?
@@ -82,7 +86,7 @@ impl<'a> JsonValue<'a> {
     }
 
     pub fn get_path_mut(&mut self, path: &str) -> Result<&mut JsonValue<'a>> {
-        use crate::parsing::{JsonParser, Rule};
+        use parsing::{JsonParser, Rule};
 
         let pairs = JsonParser::parse(Rule::json_path, path)
             .map_err(|_| anyhow!("provided path is malformated \"{path}\""))?
@@ -292,7 +296,7 @@ impl fmt::Display for DenseFormatter<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parsing::parse_json;
+    use parsing::parse_json;
 
     #[test]
     fn get_value_by_path() {

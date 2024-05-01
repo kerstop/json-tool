@@ -88,11 +88,7 @@ mod test {
 
     use super::parse_json;
 
-    const JSON_OBJECT: &'static str = r#"{
-    "nesting": { "inner object": {} },
-    "an array": [1.5, true, null, 1e-6],
-    "string with escaped double quotes" : "\"quick brown foxes\""
-}"#;
+    const JSON_OBJECT: &'static str = include_str!("parsing/test/object.json");
 
     const JSON_STRING: &'static str = "\"hello world\"";
 
@@ -130,7 +126,7 @@ mod test {
         assert_eq!(value, JsonValue::Number(1.2));
     }
 
-    const JSON_ARRAY: &'static str = "[\"hello\", 123.0, false]";
+    const JSON_ARRAY: &'static str = include_str!("parsing/test/array.json");
 
     #[test]
     fn parse_array() {
